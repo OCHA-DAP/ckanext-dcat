@@ -19,6 +19,21 @@ def read_catalog(_format=None, package_type=None):
     return utils.read_catalog_page(_format)
 
 
+def read_dataset_xml(_id, package_type=None):
+    return read_dataset(_id, 'xml', package_type)
+
+def read_dataset_rdf(_id, package_type=None):
+    return read_dataset(_id, 'rdf', package_type)
+
+def read_dataset_n3(_id, package_type=None):
+    return read_dataset(_id, 'n3', package_type)
+
+def read_dataset_ttl(_id, package_type=None):
+    return read_dataset(_id, 'ttl', package_type)
+
+def read_dataset_jsonld(_id, package_type=None):
+    return read_dataset(_id, 'jsonld', package_type)
+
 def read_dataset(_id, _format=None, package_type=None):
     return utils.read_dataset_page(_id, _format)
 
@@ -29,7 +44,12 @@ if toolkit.asbool(config.get(utils.ENABLE_RDF_ENDPOINTS_CONFIG, True)):
                                  utils.DEFAULT_CATALOG_ENDPOINT).replace(
                                      '{_format}', '<_format>'),
                       view_func=read_catalog)
-    dcat.add_url_rule('/dataset/<_id>.<_format>', view_func=read_dataset)
+    # dcat.add_url_rule('/dataset/<_id>.<_format>', view_func=read_dataset)
+    dcat.add_url_rule('/dataset/<_id>.xml', view_func=read_dataset_xml)
+    dcat.add_url_rule('/dataset/<_id>.rdf', view_func=read_dataset_rdf)
+    dcat.add_url_rule('/dataset/<_id>.n3', view_func=read_dataset_n3)
+    dcat.add_url_rule('/dataset/<_id>.ttl', view_func=read_dataset_ttl)
+    dcat.add_url_rule('/dataset/<_id>.jsonld', view_func=read_dataset_jsonld)
 
 if toolkit.asbool(config.get(utils.ENABLE_CONTENT_NEGOTIATION_CONFIG)):
     dcat.add_url_rule('/', view_func=read_catalog)
