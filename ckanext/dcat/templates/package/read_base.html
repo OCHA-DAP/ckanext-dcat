@@ -2,10 +2,10 @@
 {% block links %}
     {{ super() }}
     {% with endpoint=h.dcat_get_endpoint('dataset')  %}
-        <link rel="alternate" type="text/n3" href="{{ h.url_for(endpoint + '_n3', _id=pkg.id, _external=True) }}"/>
-        <link rel="alternate" type="text/ttl" href="{{ h.url_for(endpoint + '_ttl', _id=pkg.id, _external=True) }}"/>
-        <link rel="alternate" type="application/rdf+xml" href="{{ h.url_for(endpoint + '_xml', _id=pkg.id, _external=True) }}"/>
-        <link rel="alternate" type="application/ld+json" href="{{ h.url_for(endpoint + '_jsonld', _id=pkg.id, _external=True) }}"/>
+        <link rel="alternate" type="text/n3" href="{{ h.url_for(endpoint + '_n3', _id=pkg.id, qualified=True) }}"/>
+        <link rel="alternate" type="text/ttl" href="{{ h.url_for(endpoint + '_ttl', _id=pkg.id, qualified=True) }}"/>
+        <link rel="alternate" type="application/rdf+xml" href="{{ h.url_for(endpoint + '_xml', _id=pkg.id, qualified=True) }}"/>
+        <link rel="alternate" type="application/ld+json" href="{{ h.url_for(endpoint + '_jsonld', _id=pkg.id, qualified=True) }}"/>
     {% endwith %}
 {% endblock -%}
 {% block body_extras %}
