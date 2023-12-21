@@ -1,5 +1,4 @@
 from builtins import str
-from past.builtins import basestring
 from builtins import object
 import datetime
 import json
@@ -63,7 +62,7 @@ class URIRefOrLiteral(object):
     '''
     def __new__(cls, value):
         stripped_value = value.strip()
-        if (isinstance(value, basestring) and (stripped_value.startswith("http://")
+        if (isinstance(value, str) and (stripped_value.startswith("http://")
                                                or stripped_value.startswith("https://"))):
             uri_obj = CleanedURIRef(value)
             # although all invalid chars checked by rdflib should have been quoted, try to serialize
