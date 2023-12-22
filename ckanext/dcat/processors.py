@@ -28,8 +28,7 @@ RDF_PROFILES_ENTRY_POINT_GROUP = 'ckan.rdf.profiles'
 RDF_PROFILES_CONFIG_OPTION = 'ckanext.dcat.rdf.profiles'
 COMPAT_MODE_CONFIG_OPTION = 'ckanext.dcat.compatibility_mode'
 
-DEFAULT_RDF_PROFILES = ['euro_dcat_ap']
-
+DEFAULT_RDF_PROFILES = ['euro_dcat_ap_2']
 
 
 class RDFProcessor(object):
@@ -236,13 +235,6 @@ class RDFSerializer(RDFProcessor):
         Returns the reference to the dataset, which will be an rdflib URIRef.
         '''
 
-        uri_value = dataset_dict.get('uri')
-        if not uri_value:
-            for extra in dataset_dict.get('extras', []):
-                if extra['key'] == 'uri':
-                    uri_value = extra['value']
-                    break
-
         dataset_ref = URIRef(dataset_uri(dataset_dict))
 
         for profile_class in self._profiles:
@@ -420,7 +412,7 @@ Operation mode.
                         help='Make the output more human readable')
     parser.add_argument('-p', '--profile', nargs='*',
                         action='store',
-                        help='RDF Profiles to use, defaults to euro_dcat_ap')
+                        help='RDF Profiles to use, defaults to euro_dcat_ap_2')
     parser.add_argument('-m', '--compat-mode',
                         action='store_true',
                         help='Enable compatibility mode')
@@ -433,14 +425,6 @@ Operation mode.
     contents = args.file.read()
 
     config.update({DCAT_EXPOSE_SUBCATALOGS: args.subcatalogs})
-
-    # Workaround until the core translation function defaults to the Flask one
-    from paste.registry import Registry
-    from ckan.lib.cli import MockTranslator
-    registry = Registry()
-    registry.prepare()
-    from pylons import translator
-    registry.register(translator, MockTranslator())
 
     if args.mode == 'produce':
         serializer = RDFSerializer(profiles=args.profile,

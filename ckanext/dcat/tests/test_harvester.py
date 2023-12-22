@@ -4,10 +4,14 @@ from builtins import str
 from builtins import range
 from builtins import object
 from collections import defaultdict
+import re
 
 import pytest
 import responses
-from mock import patch
+try:
+    from unittest.mock import patch
+except ImportError:
+    from mock import patch
 
 import ckan.plugins as p
 from ckantoolkit import config
@@ -21,7 +25,7 @@ from ckanext.dcat.interfaces import IDCATRDFHarvester
 import ckanext.dcat.harvesters.rdf
 
 
-responses.add_passthru(config.get('solr_url', 'http://127.0.0.1:8983/solr'))
+
 
 
 # TODO move to ckanext-harvest
@@ -537,6 +541,13 @@ class FunctionalHarvestTest(object):
           dc:title "Example dataset 1" .
           '''
 
+    def _add_responses_solr_passthru(self):
+        responses.add_passthru(
+            re.compile(
+                config.get(
+                    'solr_url', 'http://127.0.0.1:8983/solr').rstrip('/') + "/\\w+"
+            )
+        )
 
     def _create_harvest_source(self, mock_url, **kwargs):
 
@@ -651,6 +662,8 @@ class TestDCATHarvestFunctional(FunctionalHarvestTest):
     @responses.activate
     def _test_harvest_create(self, url, content, content_type, **kwargs):
 
+        self._add_responses_solr_passthru()
+
         # Mock the GET request to get the file
         responses.add(responses.GET, url,
                                body=content, content_type=content_type)
@@ -673,8 +686,67 @@ class TestDCATHarvestFunctional(FunctionalHarvestTest):
             assert result['title'] in ('Example dataset 1',
                                        'Example dataset 2')
 
+    @patch('ckanext.dcat.harvesters.DCATRDFHarvester._save_gather_error')
+    @responses.activate
+    def test_harvest_default_file_size(self, mock_save_gather_error):
+        # prepare
+        self._add_responses_solr_passthru()
+        harvester = DCATRDFHarvester()
+        actual_file_size =  1024 * 1024 * 110
+        allowed_file_size = 1024 * 1024 * 50
+
+        # The harvester will try to do a HEAD request first so we need to mock
+        # this as well
+        responses.add(responses.HEAD, self.ttl_mock_url,
+                               status=200, content_type=self.ttl_content_type,
+                               adding_headers = {'content-length': str(actual_file_size)})
+
+        harvest_source = self._create_harvest_source(self.ttl_mock_url)
+        # Create new job for the source
+        harvest_job = self._create_harvest_job(harvest_source['id'])
+
+        # execute
+        harvester._get_content_and_type(self.ttl_mock_url, harvest_job, 1, self.ttl_content_type)
+
+        # verify
+        msg = '''Remote file is too big. Allowed
+                    file size: {allowed}, Content-Length: {actual}.'''.format(
+                    allowed=allowed_file_size, actual=actual_file_size)
+        mock_save_gather_error.assert_called_once_with(msg, harvest_job)
+
+    @patch('ckanext.dcat.harvesters.DCATRDFHarvester._save_gather_error')
+    @responses.activate
+    @pytest.mark.ckan_config('ckanext.dcat.max_file_size', 100)
+    def test_harvest_config_file_size(self, mock_save_gather_error):
+        # prepare
+        harvester = DCATRDFHarvester()
+        self._add_responses_solr_passthru()
+        actual_file_size =  1024 * 1024 * 110
+        allowed_file_size = 1024 * 1024 * 100
+
+        # The harvester will try to do a HEAD request first so we need to mock
+        # this as well  , content_length=file_size
+        responses.add(responses.HEAD, self.ttl_mock_url,
+                               status=200, content_type=self.ttl_content_type,
+                               adding_headers = {'content-length': str(actual_file_size)})
+
+        harvest_source = self._create_harvest_source(self.ttl_mock_url)
+        # Create new job for the source
+        harvest_job = self._create_harvest_job(harvest_source['id'])
+
+        # execute
+        harvester._get_content_and_type(self.ttl_mock_url, harvest_job, 1, self.ttl_content_type)
+
+        # verify
+        msg = '''Remote file is too big. Allowed
+                    file size: {allowed}, Content-Length: {actual}.'''.format(
+                    allowed=allowed_file_size, actual=actual_file_size)
+        mock_save_gather_error.assert_called_once_with(msg, harvest_job)
+
     @responses.activate
     def test_harvest_create_rdf_pagination(self):
+
+        self._add_responses_solr_passthru()
 
         # Mock the GET requests needed to get the file
         responses.add(responses.GET, self.rdf_mock_url_pagination_1,
@@ -711,6 +783,8 @@ class TestDCATHarvestFunctional(FunctionalHarvestTest):
 
     @responses.activate
     def test_harvest_create_rdf_pagination_same_content(self):
+
+        self._add_responses_solr_passthru()
 
         # Mock the GET requests needed to get the file. Two different URLs but
         # same content to mock a misconfigured server
@@ -771,6 +845,9 @@ class TestDCATHarvestFunctional(FunctionalHarvestTest):
 
     @responses.activate
     def _test_harvest_update(self, url, content, content_type):
+
+        self._add_responses_solr_passthru()
+
         # Mock the GET request to get the file
         responses.add(responses.GET, url,
                                body=content, content_type=content_type)
@@ -829,6 +906,9 @@ class TestDCATHarvestFunctional(FunctionalHarvestTest):
 
     @responses.activate
     def _test_harvest_update_resources(self, url, content, content_type):
+
+        self._add_responses_solr_passthru()
+
         # Mock the GET request to get the file
         responses.add(responses.GET, url,
                                body=content, content_type=content_type)
@@ -892,6 +972,8 @@ class TestDCATHarvestFunctional(FunctionalHarvestTest):
     @responses.activate
     def _test_harvest_delete(self, url, content, content_small, content_type):
 
+        self._add_responses_solr_passthru()
+
         # Mock the GET request to get the file
         responses.add(responses.GET, url,
                                body=content, content_type=content_type)
@@ -938,6 +1020,8 @@ class TestDCATHarvestFunctional(FunctionalHarvestTest):
     @responses.activate
     def _test_harvest_bad_format(self, url, bad_content, content_type):
 
+        self._add_responses_solr_passthru()
+
         # Mock the GET request to get the file
         responses.add(responses.GET, url,
                                body=bad_content, content_type=content_type)
@@ -963,11 +1047,14 @@ class TestDCATHarvestFunctional(FunctionalHarvestTest):
 
         assert last_job_status['status'] == 'Finished'
         assert ('Error parsing the RDF file'
-                in last_job_status['gather_error_summary'][0][0])
+                in last_job_status['gather_error_summary'][0]['message'])
 
     @responses.activate
     @patch.object(ckanext.dcat.harvesters.rdf.RDFParser, 'datasets')
     def test_harvest_exception_in_profile(self, mock_datasets):
+
+        self._add_responses_solr_passthru()
+
         mock_datasets.side_effect = Exception
 
         # Mock the GET request to get the file
@@ -995,10 +1082,12 @@ class TestDCATHarvestFunctional(FunctionalHarvestTest):
 
         assert last_job_status['status'] == 'Finished'
         assert ('Error when processsing dataset'
-                in last_job_status['gather_error_summary'][0][0])
+                in last_job_status['gather_error_summary'][0]['message'])
 
     @responses.activate
     def test_harvest_create_duplicate_titles(self):
+
+        self._add_responses_solr_passthru()
 
         # Mock the GET request to get the file
         responses.add(responses.GET, self.rdf_mock_url_duplicates,
@@ -1049,6 +1138,8 @@ class TestDCATHarvestFunctionalExtensionPoints(FunctionalHarvestTest):
     @responses.activate
     def test_harvest_before_download_null_url_stops_gather_stage(self, reset_calls_counter):
 
+        self._add_responses_solr_passthru()
+
         reset_calls_counter('test_rdf_harvester')
         plugin = p.get_plugin('test_rdf_harvester')
 
@@ -1091,6 +1182,8 @@ class TestDCATHarvestFunctionalExtensionPoints(FunctionalHarvestTest):
     @responses.activate
     def test_harvest_before_download_errors_get_stored(self, reset_calls_counter):
 
+        self._add_responses_solr_passthru()
+
         reset_calls_counter('test_rdf_harvester')
         plugin = p.get_plugin('test_rdf_harvester')
 
@@ -1126,8 +1219,8 @@ class TestDCATHarvestFunctionalExtensionPoints(FunctionalHarvestTest):
 
         last_job_status = harvest_source['status']['last_job']
 
-        assert 'Error 1' == last_job_status['gather_error_summary'][0][0]
-        assert 'Error 2' == last_job_status['gather_error_summary'][1][0]
+        assert 'Error 1' == last_job_status['gather_error_summary'][0]['message']
+        assert 'Error 2' == last_job_status['gather_error_summary'][1]['message']
 
     def test_harvest_update_session_extension_point_gets_called(self, reset_calls_counter):
 
@@ -1145,6 +1238,7 @@ class TestDCATHarvestFunctionalExtensionPoints(FunctionalHarvestTest):
     @responses.activate
     def test_harvest_update_session_add_header(self, reset_calls_counter):
 
+        self._add_responses_solr_passthru()
         reset_calls_counter('test_rdf_harvester')
         plugin = p.get_plugin('test_rdf_harvester')
 
@@ -1168,6 +1262,7 @@ class TestDCATHarvestFunctionalExtensionPoints(FunctionalHarvestTest):
     @responses.activate
     def test_harvest_after_download_extension_point_gets_called(self, reset_calls_counter):
 
+        self._add_responses_solr_passthru()
         reset_calls_counter('test_rdf_harvester')
         plugin = p.get_plugin('test_rdf_harvester')
 
@@ -1189,6 +1284,7 @@ class TestDCATHarvestFunctionalExtensionPoints(FunctionalHarvestTest):
     @responses.activate
     def test_harvest_after_download_empty_content_stops_gather_stage(self, reset_calls_counter):
 
+        self._add_responses_solr_passthru()
         reset_calls_counter('test_rdf_harvester')
         plugin = p.get_plugin('test_rdf_harvester')
 
@@ -1232,6 +1328,7 @@ class TestDCATHarvestFunctionalExtensionPoints(FunctionalHarvestTest):
     @responses.activate
     def test_harvest_after_download_errors_get_stored(self, reset_calls_counter):
 
+        self._add_responses_solr_passthru()
         reset_calls_counter('test_rdf_harvester')
         plugin = p.get_plugin('test_rdf_harvester')
 
@@ -1268,12 +1365,13 @@ class TestDCATHarvestFunctionalExtensionPoints(FunctionalHarvestTest):
 
         last_job_status = harvest_source['status']['last_job']
 
-        assert 'Error 1' == last_job_status['gather_error_summary'][0][0]
-        assert 'Error 2' == last_job_status['gather_error_summary'][1][0]
+        assert 'Error 1' == last_job_status['gather_error_summary'][0]['message']
+        assert 'Error 2' == last_job_status['gather_error_summary'][1]['message']
 
     @responses.activate
     def test_harvest_after_parsing_extension_point_gets_called(self, reset_calls_counter):
 
+        self._add_responses_solr_passthru()
         reset_calls_counter('test_rdf_harvester')
         plugin = p.get_plugin('test_rdf_harvester')
 
@@ -1300,6 +1398,7 @@ class TestDCATHarvestFunctionalExtensionPoints(FunctionalHarvestTest):
     @responses.activate
     def test_harvest_after_parsing_empty_content_stops_gather_stage(self, reset_calls_counter):
 
+        self._add_responses_solr_passthru()
         reset_calls_counter('test_rdf_harvester')
         plugin = p.get_plugin('test_rdf_harvester')
         plugin.after_parsing_mode = 'return.empty.rdf_parser'
@@ -1345,6 +1444,7 @@ class TestDCATHarvestFunctionalExtensionPoints(FunctionalHarvestTest):
     @responses.activate
     def test_harvest_after_parsing_errors_get_stored(self, reset_calls_counter):
 
+        self._add_responses_solr_passthru()
         reset_calls_counter('test_rdf_harvester')
         plugin = p.get_plugin('test_rdf_harvester')
         plugin.after_parsing_mode = 'return.errors'
@@ -1380,14 +1480,15 @@ class TestDCATHarvestFunctionalExtensionPoints(FunctionalHarvestTest):
 
             last_job_status = harvest_source['status']['last_job']
 
-            assert 'Error 1' == last_job_status['gather_error_summary'][0][0]
-            assert 'Error 2' == last_job_status['gather_error_summary'][1][0]
+            assert 'Error 1' == last_job_status['gather_error_summary'][0]['message']
+            assert 'Error 2' == last_job_status['gather_error_summary'][1]['message']
         finally:
             plugin.after_parsing_mode = ''
 
     @responses.activate
     def test_harvest_import_extensions_point_gets_called(self, reset_calls_counter):
 
+        self._add_responses_solr_passthru()
         reset_calls_counter('test_rdf_harvester')
         plugin = p.get_plugin('test_rdf_harvester')
 
@@ -1455,6 +1556,7 @@ class TestDCATHarvestFunctionalSetNull(FunctionalHarvestTest):
     @responses.activate
     def test_harvest_with_before_create_null(self, reset_calls_counter):
 
+        self._add_responses_solr_passthru()
         reset_calls_counter('test_rdf_null_harvester')
         plugin = p.get_plugin('test_rdf_null_harvester')
 
@@ -1514,6 +1616,8 @@ class TestDCATHarvestFunctionalRaiseExcpetion(FunctionalHarvestTest):
 
     @responses.activate
     def test_harvest_with_before_create_raising_exception(self, reset_calls_counter):
+
+        self._add_responses_solr_passthru()
         reset_calls_counter('test_rdf_exception_harvester')
         plugin = p.get_plugin('test_rdf_exception_harvester')
 
@@ -1544,7 +1648,7 @@ class TestDCATHarvestFunctionalRaiseExcpetion(FunctionalHarvestTest):
         assert last_job_status['status'] == 'Finished'
 
         assert ('Error importing dataset'
-                in last_job_status['object_error_summary'][0][0])
+                in last_job_status['object_error_summary'][0]['message'])
 
         assert (
             last_job_status['stats'] ==
