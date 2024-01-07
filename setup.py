@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-version = '1.1.2'
+version = '1.5.1'
 
 setup(
     name='ckanext-dcat',
@@ -42,10 +42,8 @@ setup(
 
     [ckan.rdf.profiles]
     euro_dcat_ap=ckanext.dcat.profiles:EuropeanDCATAPProfile
+    euro_dcat_ap_2=ckanext.dcat.profiles:EuropeanDCATAP2Profile
     schemaorg=ckanext.dcat.profiles:SchemaOrgProfile
-
-    [paste.paster_command]
-    generate_static = ckanext.dcat.commands:GenerateStaticDCATCommand
 
     [babel.extractors]
     ckan = ckan.lib.extract:extract_ckan

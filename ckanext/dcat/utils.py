@@ -10,27 +10,15 @@ import operator
 
 from ckantoolkit import config, h
 
-try:
-    # CKAN >= 2.6
-    from ckan.exceptions import HelperError
-except ImportError:
-    # CKAN < 2.6
-    class HelperError(Exception):
-        pass
+from ckan.exceptions import HelperError
 
 from ckan import model
 import ckan.plugins.toolkit as toolkit
 
 from ckanext.dcat.exceptions import RDFProfileException
 
-if toolkit.check_ckan_version(max_version='2.8.99'):
-    from ckan.controllers.package import PackageController
-    from ckan.controllers.home import HomeController
-    read_endpoint = PackageController().read
-    index_endpoint = HomeController().index
-else:
-    from ckan.views.home import index as index_endpoint
-    from ckan.views.dataset import read as read_endpoint
+from ckan.views.home import index as index_endpoint
+from ckan.views.dataset import read as read_endpoint
 
 _ = toolkit._
 
@@ -241,18 +229,10 @@ def resource_uri(resource_dict):
     return uri
 
 
-def publisher_uri_from_dataset_dict(dataset_dict):
+def publisher_uri_organization_fallback(dataset_dict):
     '''
-    Returns an URI for a dataset's publisher
-
-    This will be used to uniquely reference the publisher on the RDF
-    serializations.
-
-    The value will be the first found of:
-
-        1. The value of the `publisher_uri` field
-        2. The value of an extra with key `publisher_uri`
-        3. `catalog_uri()` + '/organization/' + `organization id` field
+    Builds a fallback dataset URI of the form
+    `catalog_uri()` + '/organization/' + `organization id` field
 
     Check the documentation for `catalog_uri()` for the recommended ways of
     setting it.
@@ -260,19 +240,11 @@ def publisher_uri_from_dataset_dict(dataset_dict):
     Returns a string with the publisher URI, or None if no URI could be
     generated.
     '''
-
-    uri = dataset_dict.get('publisher_uri')
-    if not uri:
-        for extra in dataset_dict.get('extras', []):
-            if extra['key'] == 'publisher_uri':
-                uri = extra['value']
-                break
-    if not uri and dataset_dict.get('organization'):
-        uri = '{0}/organization/{1}'.format(catalog_uri().rstrip('/'),
+    if dataset_dict.get('organization'):
+        return '{0}/organization/{1}'.format(catalog_uri().rstrip('/'),
                                             dataset_dict['organization']['id'])
 
-    return uri
-
+    return None
 
 def dataset_id_from_resource(resource_dict):
     '''
@@ -428,10 +400,7 @@ def read_dataset_page(_id, _format):
         _format = check_access_header()
 
     if not _format:
-        if toolkit.check_ckan_version(max_version='2.8.99'):
-            return read_endpoint(_id)
-        else:
-            return read_endpoint(_get_package_type(_id), _id)
+        return read_endpoint(_get_package_type(_id), _id)
 
     _profiles = toolkit.request.params.get('profiles')
     if _profiles:
@@ -447,12 +416,9 @@ def read_dataset_page(_id, _format):
     except toolkit.NotAuthorized:
         toolkit.abort(404)
 
-    if toolkit.check_ckan_version(max_version='2.8.99'):
-        toolkit.response.headers.update({'Content-type': CONTENT_TYPES[_format]})
-    else:
-        from flask import make_response
-        response = make_response(response)
-        response.headers['Content-type'] = CONTENT_TYPES[_format]
+    from flask import make_response
+    response = make_response(response)
+    response.headers['Content-type'] = CONTENT_TYPES[_format]
 
     return response
 
@@ -481,19 +447,16 @@ def read_catalog_page(_format):
     except (toolkit.ValidationError, RDFProfileException) as e:
         toolkit.abort(409, str(e))
 
-    if toolkit.check_ckan_version(max_version='2.8.99'):
-        toolkit.response.headers.update(
-            {'Content-type': CONTENT_TYPES[_format]})
-    else:
-        from flask import make_response
-        response = make_response(response)
-        response.headers['Content-type'] = CONTENT_TYPES[_format]
+    from flask import make_response
+    response = make_response(response)
+    response.headers['Content-type'] = CONTENT_TYPES[_format]
 
     return response
 
 
+def endpoints_enabled():
+    return toolkit.asbool(config.get(ENABLE_RDF_ENDPOINTS_CONFIG, True))
+
+
 def get_endpoint(_type='dataset'):
-    if toolkit.check_ckan_version(min_version='2.9'):
-        return 'dcat.read_dataset' if _type == 'dataset' else 'dcat.read_catalog'
-    else:
-        return 'dcat_dataset' if _type == 'dataset' else 'dcat_catalog'
+    return 'dcat.read_dataset' if _type == 'dataset' else 'dcat.read_catalog'
