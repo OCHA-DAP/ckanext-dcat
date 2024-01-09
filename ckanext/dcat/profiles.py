@@ -1,6 +1,3 @@
-from builtins import str
-from past.builtins import basestring
-from builtins import object
 import datetime
 import json
 
@@ -67,7 +64,7 @@ class URIRefOrLiteral(object):
     def __new__(cls, value):
         try:
             stripped_value = value.strip()
-            if (isinstance(value, basestring) and (stripped_value.startswith("http://")
+            if (isinstance(value, str) and (stripped_value.startswith("http://")
                                                 or stripped_value.startswith("https://"))):
                 uri_obj = CleanedURIRef(value)
                 # although all invalid chars checked by rdflib should have been quoted, try to serialize
@@ -101,7 +98,7 @@ class CleanedURIRef(object):
         return value
 
     def __new__(cls, value):
-        if isinstance(value, basestring):
+        if isinstance(value, str):
             value = CleanedURIRef._careful_quote(value.strip())
         return URIRef(value)
 
@@ -662,7 +659,7 @@ class RDFProfile(object):
         # List of values
         if isinstance(value, list):
             items = value
-        elif isinstance(value, basestring):
+        elif isinstance(value, str):
             try:
                 items = json.loads(value)
                 if isinstance(items, ((int, float, complex))):
