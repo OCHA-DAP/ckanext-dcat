@@ -382,8 +382,8 @@ def check_access_header():
 
 def dcat_json_page():
      data_dict = {
-         'page': toolkit.request.params.get('page'),
-         'modified_since': toolkit.request.params.get('modified_since'),
+         'page': toolkit.request.args.get('page'),
+         'modified_since': toolkit.request.args.get('modified_since'),
      }
 
      try:
@@ -402,7 +402,7 @@ def read_dataset_page(_id, _format):
     if not _format:
         return read_endpoint(_get_package_type(_id), _id)
 
-    _profiles = toolkit.request.params.get('profiles')
+    _profiles = toolkit.request.args.get('profiles')
     if _profiles:
         _profiles = _profiles.split(',')
 
@@ -429,15 +429,15 @@ def read_catalog_page(_format):
     if not _format:
         return index_endpoint()
 
-    _profiles = toolkit.request.params.get('profiles')
+    _profiles = toolkit.request.args.get('profiles')
     if _profiles:
         _profiles = _profiles.split(',')
 
     data_dict = {
-        'page': toolkit.request.params.get('page'),
-        'modified_since': toolkit.request.params.get('modified_since'),
-        'q': toolkit.request.params.get('q'),
-        'fq': toolkit.request.params.get('fq'),
+        'page': toolkit.request.args.get('page'),
+        'modified_since': toolkit.request.args.get('modified_since'),
+        'q': toolkit.request.args.get('q'),
+        'fq': toolkit.request.args.get('fq'),
         'format': _format,
         'profiles': _profiles,
     }
